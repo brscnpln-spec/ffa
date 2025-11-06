@@ -835,6 +835,7 @@ const FreightForwarderApp = () => {
         weight: formData.weight === '' ? null : formData.weight,
         cbm: formData.cbm === '' ? null : formData.cbm,
         ldm: formData.ldm === '' ? null : formData.ldm,
+        valid_until: formData.valid_until === '' ? null : formData.valid_until,
       };
 
       if (editingPrice) {
