@@ -829,10 +829,18 @@ const FreightForwarderApp = () => {
     };
 
     const handleSubmitPrice = async () => {
+      const cleanedData = {
+        ...formData,
+        price: formData.price === '' ? null : formData.price,
+        weight: formData.weight === '' ? null : formData.weight,
+        cbm: formData.cbm === '' ? null : formData.cbm,
+        ldm: formData.ldm === '' ? null : formData.ldm,
+      };
+
       if (editingPrice) {
         const { error } = await supabase
           .from('prices')
-          .update(formData)
+          .update(cleanedData)
           .eq('id', editingPrice.id);
 
         if (error) {
@@ -842,7 +850,7 @@ const FreightForwarderApp = () => {
       } else {
         const { error } = await supabase
           .from('prices')
-          .insert([formData]);
+          .insert([cleanedData]);
 
         if (error) {
           alert('Ekleme hatası: ' + error.message);
