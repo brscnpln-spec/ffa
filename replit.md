@@ -6,15 +6,25 @@ A comprehensive freight forwarding management system built with React and Supaba
 **Current State:** Configured for Replit environment with Create React App running on port 5000.
 
 ## Recent Changes
-- **November 6, 2025**: Initial Replit setup completed
-  - Configured Create React App to run on port 5000
-  - Set up environment variables for Supabase credentials
-  - Configured host settings to work with Replit's proxy
-  - Updated supabaseClient.js to use environment variables
-  - Installed all npm dependencies
-  - Created workflow configuration for React App
-  - Configured deployment settings (autoscale with serve)
-  - Verified app is running correctly with Supabase connection
+- **November 6, 2025**: Initial Replit setup and bug fixes
+  - **Setup:**
+    - Configured Create React App to run on port 5000
+    - Set up environment variables for Supabase credentials
+    - Configured host settings to work with Replit's proxy
+    - Updated supabaseClient.js to use environment variables
+    - Installed all npm dependencies
+    - Created workflow configuration for React App
+    - Configured deployment settings (autoscale with serve)
+    - Verified app is running correctly with Supabase connection
+  
+  - **Bug Fixes:**
+    - Fixed "invalid input syntax for type numeric" error when adding prices with empty numeric fields
+    - Fixed "invalid input syntax for type date" error when date field is empty
+    - Added form validation for required fields in Price Database
+    - Improved all error messages across the app (Master Data, Partners, Projects, Prices)
+    - Added success confirmation messages for all CRUD operations
+    - Marked required fields with asterisks (*) in Price form
+    - Empty optional fields (weight, cbm, ldm, valid_until) now correctly save as NULL in database
 
 ## Project Architecture
 

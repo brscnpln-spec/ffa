@@ -121,7 +121,8 @@ const FreightForwarderApp = () => {
         .insert([{ name: newItem }]);
 
       if (error) {
-        alert('Ekleme hatası: ' + error.message);
+        console.error('Ekleme hatası:', error);
+        alert('Kayıt eklenirken bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
@@ -142,7 +143,8 @@ const FreightForwarderApp = () => {
         .eq('id', editingId);
 
       if (error) {
-        alert('Güncelleme hatası: ' + error.message);
+        console.error('Güncelleme hatası:', error);
+        alert('Kayıt güncellenirken bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
@@ -159,7 +161,8 @@ const FreightForwarderApp = () => {
         .eq('id', id);
 
       if (error) {
-        alert('Silme hatası: ' + error.message);
+        console.error('Silme hatası:', error);
+        alert('Kayıt silinirken bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
@@ -283,18 +286,22 @@ const FreightForwarderApp = () => {
           .eq('id', editingPartner.id);
 
         if (error) {
-          alert('Güncelleme hatası: ' + error.message);
+          console.error('Güncelleme hatası:', error);
+          alert('Partner güncellenirken bir hata oluştu. Lütfen tekrar deneyin.');
           return;
         }
+        alert('Partner başarıyla güncellendi!');
       } else {
         const { error } = await supabase
           .from('partners')
           .insert([formData]);
 
         if (error) {
-          alert('Ekleme hatası: ' + error.message);
+          console.error('Ekleme hatası:', error);
+          alert('Partner eklenirken bir hata oluştu. Lütfen tekrar deneyin.');
           return;
         }
+        alert('Partner başarıyla eklendi!');
       }
 
       resetForm();
@@ -314,10 +321,12 @@ const FreightForwarderApp = () => {
         .eq('id', id);
 
       if (error) {
-        alert('Silme hatası: ' + error.message);
+        console.error('Silme hatası:', error);
+        alert('Partner silinirken bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
+      alert('Partner başarıyla silindi!');
       await refreshPartners();
     };
 
@@ -520,18 +529,22 @@ const FreightForwarderApp = () => {
           .eq('id', editingProject.id);
 
         if (error) {
-          alert('Güncelleme hatası: ' + error.message);
+          console.error('Güncelleme hatası:', error);
+          alert('Proje güncellenirken bir hata oluştu. Lütfen tekrar deneyin.');
           return;
         }
+        alert('Proje başarıyla güncellendi!');
       } else {
         const { error } = await supabase
           .from('projects')
           .insert([{ ...formData, project_id: generateProjectId() }]);
 
         if (error) {
-          alert('Ekleme hatası: ' + error.message);
+          console.error('Ekleme hatası:', error);
+          alert('Proje eklenirken bir hata oluştu. Lütfen tekrar deneyin.');
           return;
         }
+        alert('Proje başarıyla eklendi!');
       }
 
       resetForm();
@@ -551,10 +564,12 @@ const FreightForwarderApp = () => {
         .eq('id', id);
 
       if (error) {
-        alert('Silme hatası: ' + error.message);
+        console.error('Silme hatası:', error);
+        alert('Proje silinirken bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
+      alert('Proje başarıyla silindi!');
       await refreshProjects();
     };
 
@@ -572,7 +587,8 @@ const FreightForwarderApp = () => {
         .eq('id', projectId);
 
       if (error) {
-        alert('Fiyat güncelleme hatası: ' + error.message);
+        console.error('Fiyat güncelleme hatası:', error);
+        alert('Partner fiyatı güncellenirken bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
@@ -829,6 +845,13 @@ const FreightForwarderApp = () => {
     };
 
     const handleSubmitPrice = async () => {
+      // Zorunlu alan kontrolü
+      if (!formData.origin || !formData.destination || !formData.partner || 
+          !formData.transport_type || !formData.vehicle_type || !formData.price) {
+        alert('Lütfen tüm zorunlu alanları doldurun:\n- Çıkış Lokasyonu\n- Varış Lokasyonu\n- Partner\n- Nakliye Tipi\n- Araç Tipi\n- Fiyat');
+        return;
+      }
+
       const cleanedData = {
         ...formData,
         price: formData.price === '' ? null : formData.price,
@@ -845,18 +868,22 @@ const FreightForwarderApp = () => {
           .eq('id', editingPrice.id);
 
         if (error) {
-          alert('Güncelleme hatası: ' + error.message);
+          console.error('Güncelleme hatası:', error);
+          alert('Fiyat güncellenirken bir hata oluştu. Lütfen tekrar deneyin.');
           return;
         }
+        alert('Fiyat başarıyla güncellendi!');
       } else {
         const { error } = await supabase
           .from('prices')
           .insert([cleanedData]);
 
         if (error) {
-          alert('Ekleme hatası: ' + error.message);
+          console.error('Ekleme hatası:', error);
+          alert('Fiyat eklenirken bir hata oluştu. Lütfen tekrar deneyin.');
           return;
         }
+        alert('Fiyat başarıyla eklendi!');
       }
 
       resetForm();
@@ -876,10 +903,12 @@ const FreightForwarderApp = () => {
         .eq('id', id);
 
       if (error) {
-        alert('Silme hatası: ' + error.message);
+        console.error('Silme hatası:', error);
+        alert('Fiyat silinirken bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
+      alert('Fiyat başarıyla silindi!');
       await refreshPrices();
     };
 
@@ -906,8 +935,9 @@ const FreightForwarderApp = () => {
                 value={formData.origin}
                 onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
                 className="px-4 py-2 border rounded-lg"
+                required
               >
-                <option value="">Çıkış Lokasyonu</option>
+                <option value="">Çıkış Lokasyonu *</option>
                 {originLocations.map(loc => (
                   <option key={loc.id} value={loc.name}>{loc.name}</option>
                 ))}
@@ -916,9 +946,10 @@ const FreightForwarderApp = () => {
               <select
                 value={formData.destination}
                 onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                className="px-4 py-2:border rounded-lg"
+                className="px-4 py-2 border rounded-lg"
+                required
               >
-                <option value="">Varış Lokasyonu</option>
+                <option value="">Varış Lokasyonu *</option>
                 {destinationLocations.map(loc => (
                   <option key={loc.id} value={loc.name}>{loc.name}</option>
                 ))}
@@ -928,8 +959,9 @@ const FreightForwarderApp = () => {
                 value={formData.partner}
                 onChange={(e) => setFormData({ ...formData, partner: e.target.value })}
                 className="px-4 py-2 border rounded-lg"
+                required
               >
-                <option value="">Partner Seç</option>
+                <option value="">Partner Seç *</option>
                 {partners.map(p => (
                   <option key={p.id} value={p.company_name}>{p.company_name}</option>
                 ))}
@@ -939,8 +971,9 @@ const FreightForwarderApp = () => {
                 value={formData.transport_type}
                 onChange={(e) => setFormData({ ...formData, transport_type: e.target.value })}
                 className="px-4 py-2 border rounded-lg"
+                required
               >
-                <option value="">Nakliye Tipi</option>
+                <option value="">Nakliye Tipi *</option>
                 {transportTypes.map(t => (
                   <option key={t.id} value={t.name}>{t.name}</option>
                 ))}
@@ -950,8 +983,9 @@ const FreightForwarderApp = () => {
                 value={formData.vehicle_type}
                 onChange={(e) => setFormData({ ...formData, vehicle_type: e.target.value })}
                 className="px-4 py-2 border rounded-lg"
+                required
               >
-                <option value="">Araç Tipi</option>
+                <option value="">Araç Tipi *</option>
                 {vehicleTypes.map(v => (
                   <option key={v.id} value={v.name}>{v.name}</option>
                 ))}
@@ -959,10 +993,11 @@ const FreightForwarderApp = () => {
 
               <input
                 type="number"
-                placeholder="Fiyat (€)"
+                placeholder="Fiyat (€) *"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 className="px-4 py-2 border rounded-lg"
+                required
               />
 
               <input
