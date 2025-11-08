@@ -15,6 +15,9 @@ const FreightForwarderApp = () => {
   // State for partners
   const [partners, setPartners] = useState([]);
 
+  // State for customers
+  const [customers, setCustomers] = useState([]);
+
   // State for projects
   const [projects, setProjects] = useState([]);
 
@@ -37,12 +40,13 @@ const FreightForwarderApp = () => {
     try {
       setLoading(true);
 
-      const [vTypes, tTypes, origins, destinations, partnersData, projectsData, pricesData] = await Promise.all([
+      const [vTypes, tTypes, origins, destinations, partnersData, customersData, projectsData, pricesData] = await Promise.all([
         supabase.from('vehicle_types').select('*'),
         supabase.from('transport_types').select('*'),
         supabase.from('origin_locations').select('*'),
         supabase.from('destination_locations').select('*'),
         supabase.from('partners').select('*'),
+        supabase.from('customers').select('*'),
         supabase.from('projects').select('*'),
         supabase.from('prices').select('*')
       ]);
@@ -52,6 +56,7 @@ const FreightForwarderApp = () => {
       setOriginLocations(origins.data || []);
       setDestinationLocations(destinations.data || []);
       setPartners(partnersData.data || []);
+      setCustomers(customersData.data || []);
       setProjects(projectsData.data || []);
       setPrices(pricesData.data || []);
     } catch (error) {
@@ -810,6 +815,700 @@ const FreightForwarderApp = () => {
               )}
             </div>
           ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Customers Component
+  const Customers = () => {
+    const [showForm, setShowForm] = useState(false);
+    const [editingCustomer, setEditingCustomer] = useState(null);
+    const [showCsvImport, setShowCsvImport] = useState(false);
+    const [csvFile, setCsvFile] = useState(null);
+    const [importProgress, setImportProgress] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [filters, setFilters] = useState({
+      name: '',
+      country: '',
+      city: '',
+      email: ''
+    });
+    const [formData, setFormData] = useState({
+      name: '',
+      street: '',
+      street2: '',
+      zip: '',
+      country: '',
+      city: '',
+      phone: '',
+      email: ''
+    });
+
+    const itemsPerPage = 50;
+
+    const resetForm = () => {
+      setFormData({
+        name: '',
+        street: '',
+        street2: '',
+        zip: '',
+        country: '',
+        city: '',
+        phone: '',
+        email: ''
+      });
+      setEditingCustomer(null);
+      setShowForm(false);
+    };
+
+    const refreshCustomers = async () => {
+      const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+      setCustomers(data || []);
+    };
+
+    const validateForm = () => {
+      if (!formData.name?.trim()) {
+        alert('Şirket İsmi zorunludur.');
+        return false;
+      }
+      if (!formData.street?.trim()) {
+        alert('Adres zorunludur.');
+        return false;
+      }
+      if (!formData.country?.trim()) {
+        alert('Ülke zorunludur.');
+        return false;
+      }
+      if (!formData.city?.trim()) {
+        alert('Şehir zorunludur.');
+        return false;
+      }
+      if (!formData.email?.trim()) {
+        alert('E-mail zorunludur.');
+        return false;
+      }
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        alert('Geçerli bir e-mail adresi giriniz.');
+        return false;
+      }
+
+      return true;
+    };
+
+    const handleSubmit = async () => {
+      if (!validateForm()) return;
+
+      if (editingCustomer) {
+        const { error } = await supabase
+          .from('customers')
+          .update(formData)
+          .eq('id', editingCustomer.id);
+
+        if (error) {
+          console.error('Güncelleme hatası:', error);
+          alert('Müşteri güncellenirken bir hata oluştu. Lütfen tekrar deneyin.');
+          return;
+        }
+        alert('Müşteri başarıyla güncellendi!');
+      } else {
+        const { error } = await supabase
+          .from('customers')
+          .insert([formData]);
+
+        if (error) {
+          console.error('Ekleme hatası:', error);
+          alert('Müşteri eklenirken bir hata oluştu. Lütfen tekrar deneyin.');
+          return;
+        }
+        alert('Müşteri başarıyla eklendi!');
+      }
+
+      resetForm();
+      await refreshCustomers();
+    };
+
+    const startEditCustomer = (customer) => {
+      setFormData(customer);
+      setEditingCustomer(customer);
+      setShowForm(true);
+    };
+
+    const deleteCustomer = async (id) => {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Silme hatası:', error);
+        alert('Müşteri silinirken bir hata oluştu. Lütfen tekrar deneyin.');
+        return;
+      }
+
+      alert('Müşteri başarıyla silindi!');
+      await refreshCustomers();
+    };
+
+    // CSV Import Functions
+    const parseCSV = (text) => {
+      text = text.replace(/^\uFEFF/, '');
+      
+      const lines = text.split('\n').filter(line => line.trim());
+      if (lines.length < 2) return [];
+
+      const parseCSVLine = (line) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const headers = parseCSVLine(lines[0]);
+      const rows = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        const row = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+        rows.push(row);
+      }
+
+      return rows;
+    };
+
+    const validateAndConvertCSVRow = (row) => {
+      const errors = [];
+      
+      if (!row.name) errors.push('Şirket ismi eksik');
+      if (!row.street) errors.push('Adres eksik');
+      if (!row.country) errors.push('Ülke eksik');
+      if (!row.city) errors.push('Şehir eksik');
+      if (!row.email) errors.push('E-mail eksik');
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (row.email && !emailRegex.test(row.email.trim())) {
+        errors.push('E-mail geçersiz format');
+      }
+
+      if (errors.length > 0) {
+        return { success: false, errors };
+      }
+
+      return {
+        success: true,
+        data: {
+          name: row.name.trim(),
+          street: row.street.trim(),
+          street2: row.street2?.trim() || null,
+          zip: row.zip?.trim() || null,
+          country: row.country.trim(),
+          city: row.city.trim(),
+          phone: row.phone?.trim() || null,
+          email: row.email.trim()
+        }
+      };
+    };
+
+    const handleCsvImport = async () => {
+      if (!csvFile) {
+        alert('Lütfen bir CSV dosyası seçin.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          setImportProgress({ status: 'processing', message: 'CSV dosyası işleniyor...' });
+          
+          const text = e.target.result;
+          const rows = parseCSV(text);
+          
+          if (rows.length === 0) {
+            setImportProgress({ status: 'error', message: 'CSV dosyası boş veya geçersiz format.' });
+            return;
+          }
+
+          const validRows = [];
+          const invalidRows = [];
+
+          rows.forEach((row, index) => {
+            const result = validateAndConvertCSVRow(row);
+            if (result.success) {
+              validRows.push(result.data);
+            } else {
+              invalidRows.push({ row: index + 2, errors: result.errors });
+            }
+          });
+
+          if (validRows.length === 0) {
+            setImportProgress({ 
+              status: 'error', 
+              message: `Tüm satırlar geçersiz. ${invalidRows.length} hata bulundu.`,
+              details: invalidRows 
+            });
+            return;
+          }
+
+          setImportProgress({ 
+            status: 'importing', 
+            message: `${validRows.length} kayıt veritabanına ekleniyor...` 
+          });
+
+          let successCount = 0;
+          let failCount = 0;
+          const dbErrors = [];
+
+          for (let i = 0; i < validRows.length; i++) {
+            try {
+              const { error } = await supabase
+                .from('customers')
+                .insert([validRows[i]]);
+
+              if (error) {
+                failCount++;
+                dbErrors.push({ row: i + invalidRows.length + 2, errors: [error.message] });
+              } else {
+                successCount++;
+              }
+            } catch (err) {
+              failCount++;
+              dbErrors.push({ row: i + invalidRows.length + 2, errors: [err.message] });
+            }
+          }
+
+          await refreshCustomers();
+          
+          const allErrors = [...invalidRows, ...dbErrors];
+          setImportProgress({ 
+            status: successCount > 0 ? 'success' : 'error', 
+            message: `${successCount} müşteri başarıyla eklendi.${failCount > 0 ? ` ${failCount} kayıt eklenemedi.` : ''}${invalidRows.length > 0 ? ` ${invalidRows.length} satır format hatası nedeniyle atlandı.` : ''}`,
+            successCount: successCount,
+            errorCount: allErrors.length,
+            errors: allErrors
+          });
+
+          setCsvFile(null);
+          setTimeout(() => {
+            setShowCsvImport(false);
+            setImportProgress(null);
+          }, 5000);
+        } catch (error) {
+          console.error('CSV import hatası:', error);
+          setImportProgress({ 
+            status: 'error', 
+            message: 'CSV işlenirken bir hata oluştu: ' + error.message 
+          });
+        }
+      };
+
+      reader.readAsText(csvFile);
+    };
+
+    // Filtering
+    const getFilteredCustomers = () => {
+      return customers.filter(customer => {
+        if (filters.name && !customer.name?.toLowerCase().includes(filters.name.toLowerCase())) return false;
+        if (filters.country && !customer.country?.toLowerCase().includes(filters.country.toLowerCase())) return false;
+        if (filters.city && !customer.city?.toLowerCase().includes(filters.city.toLowerCase())) return false;
+        if (filters.email && !customer.email?.toLowerCase().includes(filters.email.toLowerCase())) return false;
+        return true;
+      });
+    };
+
+    const resetFilters = () => {
+      setFilters({
+        name: '',
+        country: '',
+        city: '',
+        email: ''
+      });
+      setCurrentPage(1);
+    };
+
+    // Pagination
+    const filteredCustomers = getFilteredCustomers();
+    const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const currentCustomers = filteredCustomers.slice(startIndex, startIndex + itemsPerPage);
+
+    const goToPage = (page) => {
+      if (page >= 1 && page <= totalPages) {
+        setCurrentPage(page);
+      }
+    };
+
+    const getPageNumbers = () => {
+      const pages = [];
+      const maxVisible = 7;
+      
+      if (totalPages <= maxVisible) {
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        if (currentPage <= 4) {
+          for (let i = 1; i <= 5; i++) pages.push(i);
+          pages.push('...');
+          pages.push(totalPages);
+        } else if (currentPage >= totalPages - 3) {
+          pages.push(1);
+          pages.push('...');
+          for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+        } else {
+          pages.push(1);
+          pages.push('...');
+          for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+          pages.push('...');
+          pages.push(totalPages);
+        }
+      }
+      
+      return pages;
+    };
+
+    return (
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Müşteriler</h2>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowCsvImport(true)} 
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+            >
+              <Plus size={20} /> CSV'den Toplu Ekle
+            </button>
+            <button 
+              onClick={() => setShowForm(true)} 
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Plus size={20} /> Yeni Müşteri
+            </button>
+          </div>
+        </div>
+
+        {/* CSV Import Modal */}
+        {showCsvImport && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h3 className="text-xl font-semibold mb-4">CSV'den Toplu Müşteri Ekle</h3>
+            
+            <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800 mb-2">
+                <strong>CSV Format:</strong> name, street, street2, zip, country, city, phone, email
+              </p>
+              <p className="text-sm text-blue-600">
+                <strong>Zorunlu alanlar:</strong> name, street, country, city, email
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => setCsvFile(e.target.files[0])}
+                className="px-4 py-2 border rounded-lg w-full"
+              />
+            </div>
+
+            {importProgress && (
+              <div className={`mb-4 p-4 rounded-lg ${
+                importProgress.status === 'success' ? 'bg-green-50 text-green-800' :
+                importProgress.status === 'error' ? 'bg-red-50 text-red-800' :
+                'bg-blue-50 text-blue-800'
+              }`}>
+                <p className="font-semibold">{importProgress.message}</p>
+                {importProgress.errors && importProgress.errors.length > 0 && (
+                  <div className="mt-2 max-h-40 overflow-y-auto">
+                    <p className="text-sm font-semibold">Hatalar:</p>
+                    {importProgress.errors.map((error, idx) => (
+                      <p key={idx} className="text-sm">
+                        Satır {error.row}: {error.errors.join(', ')}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleCsvImport}
+                disabled={!csvFile || importProgress?.status === 'importing'}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+              >
+                Import Başlat
+              </button>
+              <button
+                onClick={() => {
+                  setShowCsvImport(false);
+                  setCsvFile(null);
+                  setImportProgress(null);
+                }}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Form */}
+        {showForm && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h3 className="text-xl font-semibold mb-4">
+              {editingCustomer ? 'Müşteri Düzenle' : 'Yeni Müşteri'}
+            </h3>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Şirket İsmi *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">E-mail *</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">Adres *</label>
+                <input
+                  type="text"
+                  value={formData.street}
+                  onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">Adres Devamı</label>
+                <input
+                  type="text"
+                  value={formData.street2}
+                  onChange={(e) => setFormData({ ...formData, street2: e.target.value })}
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Ülke *</label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Şehir *</label>
+                <input
+                  type="text"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Posta Kodu</label>
+                <input
+                  type="text"
+                  value={formData.zip}
+                  onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Telefon</label>
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                {editingCustomer ? 'Güncelle' : 'Ekle'}
+              </button>
+              <button onClick={resetForm} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">
+                İptal
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h3 className="text-lg font-semibold mb-4">Filtrele</h3>
+          <div className="grid grid-cols-4 gap-4">
+            <input
+              type="text"
+              placeholder="Şirket İsmi"
+              value={filters.name}
+              onChange={(e) => { setFilters({ ...filters, name: e.target.value }); setCurrentPage(1); }}
+              className="px-4 py-2 border rounded-lg"
+            />
+            <input
+              type="text"
+              placeholder="Ülke"
+              value={filters.country}
+              onChange={(e) => { setFilters({ ...filters, country: e.target.value }); setCurrentPage(1); }}
+              className="px-4 py-2 border rounded-lg"
+            />
+            <input
+              type="text"
+              placeholder="Şehir"
+              value={filters.city}
+              onChange={(e) => { setFilters({ ...filters, city: e.target.value }); setCurrentPage(1); }}
+              className="px-4 py-2 border rounded-lg"
+            />
+            <input
+              type="text"
+              placeholder="E-mail"
+              value={filters.email}
+              onChange={(e) => { setFilters({ ...filters, email: e.target.value }); setCurrentPage(1); }}
+              className="px-4 py-2 border rounded-lg"
+            />
+          </div>
+          <div className="mt-4 flex justify-between items-center">
+            <p className="text-sm text-gray-600">
+              Toplam {filteredCustomers.length} müşteri bulundu
+            </p>
+            <button
+              onClick={resetFilters}
+              className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm"
+            >
+              Filtreleri Sıfırla
+            </button>
+          </div>
+        </div>
+
+        {/* Customer List */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Şirket İsmi</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Adres</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Ülke</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Şehir</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Posta Kodu</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">Telefon</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">E-mail</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold">İşlemler</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {currentCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                      Müşteri bulunamadı
+                    </td>
+                  </tr>
+                ) : (
+                  currentCustomers.map(customer => (
+                    <tr key={customer.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm">{customer.name}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {customer.street}
+                        {customer.street2 && <><br /><span className="text-gray-600">{customer.street2}</span></>}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{customer.country}</td>
+                      <td className="px-4 py-3 text-sm">{customer.city}</td>
+                      <td className="px-4 py-3 text-sm">{customer.zip || '-'}</td>
+                      <td className="px-4 py-3 text-sm">{customer.phone || '-'}</td>
+                      <td className="px-4 py-3 text-sm">{customer.email}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => startEditCustomer(customer)}
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => confirmDelete(() => deleteCustomer(customer.id))}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-4 py-3 border-t bg-gray-50 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Sayfa {currentPage} / {totalPages} (Toplam {filteredCustomers.length} kayıt, {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredCustomers.length)} arası gösteriliyor)
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Önceki
+                </button>
+                {getPageNumbers().map((page, idx) => (
+                  page === '...' ? (
+                    <span key={idx} className="px-3 py-1">...</span>
+                  ) : (
+                    <button
+                      key={idx}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-1 border rounded ${
+                        currentPage === page 
+                          ? 'bg-blue-600 text-white' 
+                          : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                ))}
+                <button
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sonraki
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1798,6 +2497,14 @@ const FreightForwarderApp = () => {
               Partnerler
             </button>
             <button
+              onClick={() => setActiveTab('customers')}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                activeTab === 'customers' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+            >
+              Müşteriler
+            </button>
+            <button
               onClick={() => setActiveTab('projects')}
               className={`px-4 py-2 rounded-lg transition-colors ${
                 activeTab === 'projects' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'
@@ -1821,6 +2528,7 @@ const FreightForwarderApp = () => {
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'master' && <MasterData />}
         {activeTab === 'partners' && <Partners />}
+        {activeTab === 'customers' && <Customers />}
         {activeTab === 'projects' && <Projects />}
         {activeTab === 'prices' && <PriceDatabase />}
       </main>
