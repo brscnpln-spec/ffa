@@ -6,6 +6,14 @@ A comprehensive freight forwarding management system built with React and Supaba
 **Current State:** Configured for Replit environment with Create React App running on port 5000.
 
 ## Recent Changes
+- **November 8, 2025**: UI Improvements
+  - **Master Data UI Enhancement:**
+    - Converted "Temel Tanımlar" (Master Data) from dropdown selection to tab-based navigation
+    - Users now stay on the same tab after making changes (add, edit, delete operations)
+    - Implemented horizontal tabs for Vehicle Type, Transport Type, Origin Location, and Destination Location
+    - Added accessibility features (role="tablist", aria-selected)
+    - Improved user experience with visual tab indicators and hover states
+
 - **November 6, 2025**: Initial Replit setup and bug fixes
   - **Setup:**
     - Configured Create React App to run on port 5000

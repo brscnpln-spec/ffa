@@ -80,6 +80,13 @@ const FreightForwarderApp = () => {
     const [editValue, setEditValue] = useState('');
     const [selectedType, setSelectedType] = useState('vehicle');
 
+    const tabs = [
+      { id: 'vehicle', label: 'Araç Tipi' },
+      { id: 'transport', label: 'Nakliye Tipi' },
+      { id: 'origin', label: 'Çıkış Lokasyonu' },
+      { id: 'destination', label: 'Varış Lokasyonu' }
+    ];
+
     const getTableName = () => {
       switch (selectedType) {
         case 'vehicle': return 'vehicle_types';
@@ -173,17 +180,24 @@ const FreightForwarderApp = () => {
       <div className="p-6">
         <h2 className="text-2xl font-bold mb-6">Temel Tanımlar</h2>
 
-        <div className="mb-6">
-          <select 
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="px-4 py-2 border rounded-lg"
-          >
-            <option value="vehicle">Araç Tipi</option>
-            <option value="transport">Nakliye Tipi</option>
-            <option value="origin">Çıkış Lokasyonu</option>
-            <option value="destination">Varış Lokasyonu</option>
-          </select>
+        <div className="mb-6 border-b border-gray-200">
+          <nav className="flex space-x-4" role="tablist">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setSelectedType(tab.id)}
+                className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                  selectedType === tab.id
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                role="tab"
+                aria-selected={selectedType === tab.id}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
 
         <div className="flex gap-2 mb-6">
