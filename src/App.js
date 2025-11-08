@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Users, Package, DollarSign, MapPin, Trash2, Edit2, Plus, Mail, AlertCircle, TrendingUp, Calendar } from 'lucide-react';
+import { Truck, Users, Package, DollarSign, MapPin, Trash2, Edit2, Plus, Mail, AlertCircle, TrendingUp, Calendar, LogOut } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const FreightForwarderApp = () => {
+  // Authentication state
+  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
@@ -31,10 +36,32 @@ const FreightForwarderApp = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteAction, setDeleteAction] = useState(null);
 
+  // Check authentication on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Load data from Supabase
   useEffect(() => {
-    loadData();
-  }, []);
+    if (session) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
+  }, [session]);
 
   const loadData = async () => {
     try {
@@ -76,6 +103,133 @@ const FreightForwarderApp = () => {
     if (deleteAction) deleteAction();
     setShowDeleteModal(false);
     setDeleteAction(null);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+  };
+
+  // Login Component
+  const LoginPage = () => {
+    const [isLogin, setIsLogin] = useState(true);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleAuth = async (e) => {
+      e.preventDefault();
+      setLoading(true);
+      setError('');
+
+      try {
+        if (isLogin) {
+          const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.auth.signUp({
+            email,
+            password,
+          });
+          if (error) throw error;
+          alert('Kayıt başarılı! Lütfen email adresinizi kontrol edin ve doğrulayın.');
+        }
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <Package size={48} className="mx-auto text-blue-600 mb-4" />
+            <h1 className="text-3xl font-bold text-gray-900">Freight Forwarder</h1>
+            <p className="text-gray-600 mt-2">Yönetim Sistemi</p>
+          </div>
+
+          <div className="mb-6 flex gap-2">
+            <button
+              onClick={() => setIsLogin(true)}
+              className={`flex-1 py-2 rounded-lg transition-colors ${
+                isLogin ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              Giriş Yap
+            </button>
+            <button
+              onClick={() => setIsLogin(false)}
+              className={`flex-1 py-2 rounded-lg transition-colors ${
+                !isLogin ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              Kayıt Ol
+            </button>
+          </div>
+
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="ornek@email.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Şifre
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="En az 6 karakter"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+                <AlertCircle size={20} />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+            >
+              {loading ? 'İşleniyor...' : isLogin ? 'Giriş Yap' : 'Kayıt Ol'}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-gray-600">
+            {isLogin ? (
+              <p>Hesabınız yok mu? <button onClick={() => setIsLogin(false)} className="text-blue-600 hover:underline">Kayıt olun</button></p>
+            ) : (
+              <p>Zaten hesabınız var mı? <button onClick={() => setIsLogin(true)} className="text-blue-600 hover:underline">Giriş yapın</button></p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Master Data Component
@@ -2573,7 +2727,7 @@ const FreightForwarderApp = () => {
     );
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-xl">Yükleniyor…</div>
@@ -2581,11 +2735,27 @@ const FreightForwarderApp = () => {
     );
   }
 
+  if (!session) {
+    return <LoginPage />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-lg">
         <div className="px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Freight Forwarder Yönetim Sistemi</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold text-gray-800">Freight Forwarder Yönetim Sistemi</h1>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">{user?.email}</span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <LogOut size={18} />
+                Çıkış
+              </button>
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab('dashboard')}
