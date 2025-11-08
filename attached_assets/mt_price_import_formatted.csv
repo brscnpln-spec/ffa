@@ -1,0 +1,3 @@
+departure_city,arrival_city,transport_type,vehicle_type,company_name,price,weight,created_at,valid_until,cbm,ldm,length,height,width,notes
+DE95 Tirschenreuth,"Augsburg*, DE",Karayolu,Lowbed & Flatbed,Muje,1350.0,,2025-11-08,,,,,,,Distance: 256 km
+DE95,"Ankara, TR",Karayolu,Flatbed,DFDS,3350.0,,2025-11-08,,,,,,,Distance: 2503 km
