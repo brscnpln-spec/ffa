@@ -7,8 +7,31 @@ A comprehensive freight forwarding management system built with React and Supaba
 
 ## Recent Changes
 - **November 8, 2025**: Major UI and Feature Improvements
+  
+  - **Projects Module Enhancements:**
+    - **Customer Integration:** Projects now linked to customer database
+      - Added `customer_id` field to projects table (UUID, nullable)
+      - Customer dropdown in project form (create & edit)
+      - Customer information displayed in project summary (name, city, country)
+    - **Improved Partner Pricing Workflow:**
+      - Changed from auto-save on input to manual "Ekle" (Add) button
+      - Price input validation before saving
+      - Success confirmation messages
+      - Better UX with temporary state management
+    - **Winning Partners Feature:**
+      - Multiple winning partners can be selected per project
+      - Checkbox-based selection in partner price list
+      - Winning partners stored in `winning_partners` JSONB array
+      - Displayed prominently in project summary with green badge
+      - Visual indicators: green text, "Kazanan" badge
+    - **Database Updates:**
+      - Added `customer_id` column (UUID, references customers table)
+      - Added `winning_partners` column (JSONB, default empty array)
+      - Empty customer_id correctly handled (null instead of empty string)
+  
   - **Customers Module:** Added comprehensive customer management
     - Created `customers` table in Supabase with fields: name, street, street2, zip, country, city, phone, email
+    - **681 Customers Imported:** Successfully imported production customer data via SQL
     - **CRUD Operations:** Add, edit, delete customer records with form validation
     - **CSV Bulk Import:** Import customers from CSV with format validation
       - Supported CSV format: id, name, street, street2, zip, country, city, phone, email
@@ -99,20 +122,27 @@ A comprehensive freight forwarding management system built with React and Supaba
    - Origin locations
    - Destination locations
 3. **Partner Management**: Contact and company information
-4. **Customer Management**: Manage customer information with filtering, pagination, and CSV import
-5. **Project Management**: Track freight forwarding projects
+4. **Customer Management**: 
+   - Manage 681 customer records with filtering, pagination, and CSV import
+   - Integration with projects module
+5. **Project Management**: 
+   - Track freight forwarding projects
+   - Link projects to customers
+   - Partner pricing with manual "Add" button workflow
+   - Select multiple winning partners per project
+   - Visual indicators for winning partners
 6. **Price Database**: Manage pricing for different routes and transport types
 
 ### Database Schema (Supabase)
 The application connects to the following Supabase tables:
-- `vehicle_types`
-- `transport_types`
-- `origin_locations`
-- `destination_locations`
-- `partners`
-- `customers` - Customer information (name, street, street2, zip, country, city, phone, email)
-- `projects`
-- `prices`
+- `vehicle_types` - Vehicle type definitions
+- `transport_types` - Transport type definitions  
+- `origin_locations` - Origin location list
+- `destination_locations` - Destination location list
+- `partners` - Partner company information with routes
+- `customers` - **681 customer records** with fields: id (UUID), name, street, street2, zip, country, city, phone, email, created_at
+- `projects` - Project tracking with fields: id, project_id, title, details, origin, destination, status, loss_reason, selected_partners (JSONB), request_text, **customer_id (UUID)**, **winning_partners (JSONB)**, created_at
+- `prices` - Pricing database with origin, destination, partner, transport/vehicle types, dimensions
 
 ### Environment Configuration
 The app uses the following environment variables (stored in `.env.local`):
