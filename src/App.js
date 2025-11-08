@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Users, Package, DollarSign, MapPin, Trash2, Edit2, Plus, Mail, AlertCircle, TrendingUp, Calendar, LogOut } from 'lucide-react';
+import { Truck, Users, Package, DollarSign, MapPin, Trash2, Edit2, Plus, Mail, AlertCircle, TrendingUp, Calendar, LogOut, LayoutDashboard, FileText, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const FreightForwarderApp = () => {
@@ -9,7 +9,15 @@ const FreightForwarderApp = () => {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [projectFilterFromDashboard, setProjectFilterFromDashboard] = useState('');
+
+  useEffect(() => {
+    if (['master', 'partners', 'customers', 'prices'].includes(activeTab)) {
+      setSettingsOpen(true);
+    }
+  }, [activeTab]);
 
   // State for master data
   const [vehicleTypes, setVehicleTypes] = useState([]);
@@ -151,8 +159,8 @@ const FreightForwarderApp = () => {
         <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-8">
             <Package size={48} className="mx-auto text-blue-600 mb-4" />
-            <h1 className="text-3xl font-bold text-gray-900">Freight Forwarder</h1>
-            <p className="text-gray-600 mt-2">Yönetim Sistemi</p>
+            <h1 className="text-3xl font-bold text-gray-900">Yarres Pro</h1>
+            <p className="text-gray-600 mt-2">by Baris Pelin</p>
           </div>
 
           <div className="mb-6 flex gap-2">
@@ -660,6 +668,18 @@ const FreightForwarderApp = () => {
     const [showForm, setShowForm] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
     const [partnerPrices, setPartnerPrices] = useState({});
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterOrigin, setFilterOrigin] = useState('');
+    const [filterDestination, setFilterDestination] = useState('');
+    const [filterCustomer, setFilterCustomer] = useState('');
+    const [filterSearch, setFilterSearch] = useState('');
+
+    useEffect(() => {
+      if (projectFilterFromDashboard) {
+        setFilterStatus(projectFilterFromDashboard);
+        setProjectFilterFromDashboard('');
+      }
+    }, [projectFilterFromDashboard]);
     const [formData, setFormData] = useState({
       title: '',
       details: '',
@@ -816,6 +836,24 @@ const FreightForwarderApp = () => {
       await refreshProjects();
     };
 
+    const filteredProjects = projects.filter(project => {
+      if (filterStatus && project.status !== filterStatus) return false;
+      if (filterOrigin && !project.origin?.toLowerCase().includes(filterOrigin.toLowerCase())) return false;
+      if (filterDestination && !project.destination?.toLowerCase().includes(filterDestination.toLowerCase())) return false;
+      if (filterCustomer && project.customer_id !== filterCustomer) return false;
+      if (filterSearch && !project.title?.toLowerCase().includes(filterSearch.toLowerCase()) && 
+          !project.project_id?.toLowerCase().includes(filterSearch.toLowerCase())) return false;
+      return true;
+    });
+
+    const resetFilters = () => {
+      setFilterStatus('');
+      setFilterOrigin('');
+      setFilterDestination('');
+      setFilterCustomer('');
+      setFilterSearch('');
+    };
+
     const togglePartnerSelect = (partnerId) => {
       const partner = partners.find(p => p.id === partnerId);
       const isSelected = formData.selected_partners.some(p => p.id === partnerId);
@@ -836,26 +874,87 @@ const FreightForwarderApp = () => {
     return (
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Proje Yönetimi</h2>
+          <h2 className="text-2xl font-bold">Teklif Yönetimi</h2>
           <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-            <Plus size={20} /> Yeni Proje
+            <Plus size={20} /> Yeni Teklif
           </button>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <h3 className="font-semibold mb-3">Filtrele</h3>
+          <div className="grid grid-cols-5 gap-3 mb-3">
+            <input
+              type="text"
+              placeholder="Başlık veya ID ara..."
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            >
+              <option value="">Tüm Durumlar</option>
+              <option value="yeni">Yeni</option>
+              <option value="fiyatlandırma">Fiyatlandırma</option>
+              <option value="kazanıldı">Kazanıldı</option>
+              <option value="kaybedildi">Kaybedildi</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Çıkış Lokasyonu"
+              value={filterOrigin}
+              onChange={(e) => setFilterOrigin(e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            />
+            <input
+              type="text"
+              placeholder="Varış Lokasyonu"
+              value={filterDestination}
+              onChange={(e) => setFilterDestination(e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            />
+            <select
+              value={filterCustomer}
+              onChange={(e) => setFilterCustomer(e.target.value)}
+              className="px-3 py-2 border rounded-lg"
+            >
+              <option value="">Tüm Müşteriler</option>
+              {customers.map(customer => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">
+              {filteredProjects.length} teklif gösteriliyor
+            </span>
+            <button
+              onClick={resetFilters}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              Filtreleri Temizle
+            </button>
+          </div>
         </div>
 
         {showForm && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h3 className="text-xl font-semibold mb-4">{editingProject ? 'Proje Düzenle' : 'Yeni Proje'}</h3>
+            <h3 className="text-xl font-semibold mb-4">{editingProject ? 'Teklif Düzenle' : 'Yeni Teklif'}</h3>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
               <input
                 type="text"
-                placeholder="Proje Başlığı"
+                placeholder="Teklif Başlığı"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="px-4 py-2 border rounded-lg col-span-2"
               />
               <textarea
-                placeholder="Proje Detayları"
+                placeholder="Teklif Detayları"
                 value={formData.details}
                 onChange={(e) => setFormData({ ...formData, details: e.target.value })}
                 className="px-4 py-2 border rounded-lg col-span-2"
@@ -969,7 +1068,7 @@ const FreightForwarderApp = () => {
         )}
 
         <div className="space-y-4">
-          {projects.map(project => (
+          {filteredProjects.map(project => (
             <div key={project.id} className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -2703,24 +2802,48 @@ const FreightForwarderApp = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-xl font-semibold mb-4">Proje Durumları</h3>
+          <h3 className="text-xl font-semibold mb-4">Teklif Durumları</h3>
           <div className="grid grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
+            <button
+              onClick={() => {
+                setProjectFilterFromDashboard('yeni');
+                setActiveTab('projects');
+              }}
+              className="text-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+            >
               <div className="text-2xl font-bold text-gray-700">{projectsByStatus.yeni}</div>
               <div className="text-sm text-gray-600">Yeni</div>
-            </div>
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
+            </button>
+            <button
+              onClick={() => {
+                setProjectFilterFromDashboard('fiyatlandırma');
+                setActiveTab('projects');
+              }}
+              className="text-center p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors cursor-pointer"
+            >
               <div className="text-2xl font-bold text-yellow-700">{projectsByStatus.fiyatlandırma}</div>
               <div className="text-sm text-yellow-600">Fiyatlandırma</div>
-            </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
+            </button>
+            <button
+              onClick={() => {
+                setProjectFilterFromDashboard('kazanıldı');
+                setActiveTab('projects');
+              }}
+              className="text-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors cursor-pointer"
+            >
               <div className="text-2xl font-bold text-green-700">{projectsByStatus.kazanıldı}</div>
               <div className="text-sm text-green-600">Kazanıldı</div>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg">
+            </button>
+            <button
+              onClick={() => {
+                setProjectFilterFromDashboard('kaybedildi');
+                setActiveTab('projects');
+              }}
+              className="text-center p-4 bg-red-50 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
+            >
               <div className="text-2xl font-bold text-red-700">{projectsByStatus.kaybedildi}</div>
               <div className="text-sm text-red-600">Kaybedildi</div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -2740,76 +2863,111 @@ const FreightForwarderApp = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-lg">
-        <div className="px-6 py-4">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold text-gray-800">Freight Forwarder Yönetim Sistemi</h1>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">{user?.email}</span>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                <LogOut size={18} />
-                Çıkış
-              </button>
-            </div>
+    <div className="min-h-screen bg-gray-100 flex">
+      {/* Sidebar */}
+      <div className="w-64 bg-white shadow-lg min-h-screen">
+        <div className="p-6">
+          <h1 className="text-2xl font-bold text-blue-600 mb-2">Yarres Pro</h1>
+          <p className="text-xs text-gray-500">by Baris Pelin</p>
+        </div>
+
+        <nav className="px-3">
+          {/* Dashboard */}
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${
+              activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <LayoutDashboard size={20} />
+            <span className="font-medium">Dashboard</span>
+          </button>
+
+          {/* Teklifler */}
+          <button
+            onClick={() => setActiveTab('projects')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${
+              activeTab === 'projects' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <FileText size={20} />
+            <span className="font-medium">Teklifler</span>
+          </button>
+
+          {/* Ayarlar */}
+          <div className="mb-1">
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
+                ['master', 'partners', 'customers', 'prices'].includes(activeTab) ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Settings size={20} />
+                <span className="font-medium">Ayarlar</span>
+              </div>
+              {settingsOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+            </button>
+
+            {/* Ayarlar Alt Menü */}
+            {settingsOpen && (
+              <div className="ml-4 mt-1 space-y-1">
+                <button
+                  onClick={() => setActiveTab('master')}
+                  className={`w-full text-left px-4 py-2 rounded-lg text-sm transition-colors ${
+                    activeTab === 'master' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Temel Tanımlar
+                </button>
+                <button
+                  onClick={() => setActiveTab('partners')}
+                  className={`w-full text-left px-4 py-2 rounded-lg text-sm transition-colors ${
+                    activeTab === 'partners' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Partnerler
+                </button>
+                <button
+                  onClick={() => setActiveTab('customers')}
+                  className={`w-full text-left px-4 py-2 rounded-lg text-sm transition-colors ${
+                    activeTab === 'customers' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Müşteriler
+                </button>
+                <button
+                  onClick={() => setActiveTab('prices')}
+                  className={`w-full text-left px-4 py-2 rounded-lg text-sm transition-colors ${
+                    activeTab === 'prices' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Fiyat Veritabanı
+                </button>
+              </div>
+            )}
           </div>
-          <div className="flex gap-2">
+        </nav>
+
+        {/* User Info & Logout */}
+        <div className="absolute bottom-0 w-64 p-4 border-t bg-white">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
+            </div>
             <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
+              onClick={handleLogout}
+              className="ml-2 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Çıkış Yap"
             >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setActiveTab('master')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                activeTab === 'master' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Temel Tanımlar
-            </button>
-            <button
-              onClick={() => setActiveTab('partners')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                activeTab === 'partners' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Partnerler
-            </button>
-            <button
-              onClick={() => setActiveTab('customers')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                activeTab === 'customers' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Müşteriler
-            </button>
-            <button
-              onClick={() => setActiveTab('projects')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                activeTab === 'projects' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Projeler
-            </button>
-            <button
-              onClick={() => setActiveTab('prices')}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                activeTab === 'prices' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'
-              }`}
-            >
-              Fiyat Veritabanı
+              <LogOut size={18} />
             </button>
           </div>
         </div>
-      </nav>
+      </div>
 
-      <main>
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto">
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'master' && <MasterData />}
         {activeTab === 'partners' && <Partners />}

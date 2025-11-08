@@ -1,13 +1,51 @@
-# Freight Forwarder Management System
+# Yarres Pro - Freight Forwarder Management System
 
 ## Overview
-A comprehensive freight forwarding management system built with React and Supabase. This application allows users to manage vehicle types, transport types, locations, partners, projects, and a price database for freight forwarding operations.
+**Yarres Pro** is a comprehensive freight forwarding management system built with React and Supabase. This application allows users to manage vehicle types, transport types, locations, partners, offers (teklifler), and a price database for freight forwarding operations.
 
-**Current State:** Configured for Replit environment with Create React App running on port 5000.
+**Developer:** Baris Pelin
+
+**Current State:** Configured for Replit environment with Create React App running on port 5000. Features modern sidebar navigation with collapsible settings menu.
 
 ## Recent Changes
-- **November 8, 2025**: Major UI and Feature Improvements + Authentication System
+- **November 8, 2025**: Major UI Redesign + Complete Feature Set
   
+  - **Branding Update:**
+    - Platform renamed to **Yarres Pro**
+    - Developer credit: **Baris Pelin**
+    - Updated branding on login page and sidebar
+
+  - **Modern Sidebar Navigation:**
+    - Left sidebar with hierarchical menu structure
+    - Dashboard - Main overview page
+    - Teklifler (Offers) - Renamed from Projects
+    - Ayarlar (Settings) - Collapsible submenu containing:
+      - Temel Tanımlar (Master Data)
+      - Partnerler (Partners)
+      - Müşteriler (Customers)
+      - Fiyat Veritabanı (Price Database)
+    - User email display and logout button in sidebar footer
+    - Auto-expand settings menu when accessing any submenu item
+    - Clean, modern design with hover states and active indicators
+
+  - **Teklifler (Offers) Module:**
+    - Renamed from "Projeler" to "Teklifler" throughout the application
+    - **Advanced Filtering System:**
+      - Search by title or ID
+      - Filter by status (Yeni, Fiyatlandırma, Kazanıldı, Kaybedildi)
+      - Filter by origin location
+      - Filter by destination location
+      - Filter by customer
+      - Real-time filtered count display
+      - One-click filter reset
+    - All form labels updated to use "Teklif" terminology
+
+  - **Interactive Dashboard:**
+    - **Clickable Status Cards:** Teklif durum kartları now clickable
+    - Clicking any status card (Yeni, Fiyatlandırma, Kazanıldı, Kaybedildi) navigates to Teklifler page with pre-filtered results
+    - Seamless integration between Dashboard overview and detailed Teklifler view
+    - Hover effects on status cards for better UX
+
   - **Authentication System:** Added Supabase Authentication for production security
     - **Login/Signup Page:** Beautiful blue gradient login form with email/password authentication
     - **Protected Routes:** Application requires login - no access without authentication
