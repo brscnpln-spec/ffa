@@ -1095,10 +1095,10 @@ const FreightForwarderApp = () => {
                     <MapPin size={16} className="inline mr-1" />
                     {project.origin} → {project.destination}
                   </p>
-                  {project.winning_partners && project.winning_partners.length > 0 && (
+                  {project.winning_partners && Array.isArray(project.winning_partners) && project.winning_partners.length > 0 && (
                     <p className="text-sm text-green-700 font-semibold mt-2">
                       <TrendingUp size={16} className="inline mr-1" />
-                      Kazanan Partnerler: {project.winning_partners.map(winningId => {
+                      Kazanan Partnerler: {(project.winning_partners || []).map(winningId => {
                         const winningPartner = project.selected_partners?.find(p => p.id === winningId);
                         return winningPartner?.company_name;
                       }).filter(Boolean).join(', ')}
