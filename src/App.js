@@ -721,9 +721,10 @@ const FreightForwarderApp = () => {
     };
 
     const handleSubmitProject = async () => {
-      const { customer_id, ...formDataWithoutCustomer } = formData;
-      
-      const projectData = formDataWithoutCustomer;
+      const projectData = {
+        ...formData,
+        customer_id: formData.customer_id || null
+      };
 
       if (editingProject) {
         const { error } = await supabase
