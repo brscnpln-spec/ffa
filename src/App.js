@@ -745,10 +745,11 @@ const FreightForwarderApp = () => {
 
         if (error) {
           console.error('Ekleme hatası:', error);
-          alert('Proje eklenirken bir hata oluştu. Lütfen tekrar deneyin.');
+          console.error('Hata detayı:', JSON.stringify(error, null, 2));
+          alert(`Teklif eklenirken bir hata oluştu: ${error.message || 'Bilinmeyen hata'}`);
           return;
         }
-        alert('Proje başarıyla eklendi!');
+        alert('Teklif başarıyla eklendi!');
       }
 
       resetForm();
