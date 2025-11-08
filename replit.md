@@ -7,6 +7,18 @@ A comprehensive freight forwarding management system built with React and Supaba
 
 ## Recent Changes
 - **November 8, 2025**: Major UI and Feature Improvements
+  - **Customers Module:** Added comprehensive customer management
+    - Created `customers` table in Supabase with fields: name, street, street2, zip, country, city, phone, email
+    - **CRUD Operations:** Add, edit, delete customer records with form validation
+    - **CSV Bulk Import:** Import customers from CSV with format validation
+      - Supported CSV format: id, name, street, street2, zip, country, city, phone, email
+      - Email validation and required field checking
+      - Partial success support (valid rows added, invalid rows reported)
+    - **Pagination:** 50 customers per page with smart page navigation
+    - **Advanced Filtering:** Filter by name, country, city, email
+    - **Customer List Table:** Displays all customer fields in organized table format
+    - Form validation: Required fields (name, street, country, city, email) with email format validation
+  
   - **Price Database Enhancements:**
     - **CSV Bulk Import:** Added ability to import prices from CSV files with format validation
       - Supported CSV format: departure_city, arrival_city, transport_type, vehicle_type, company_name, price, weight, created_at, valid_until, cbm, ldm, length, height, width, notes
@@ -87,8 +99,9 @@ A comprehensive freight forwarding management system built with React and Supaba
    - Origin locations
    - Destination locations
 3. **Partner Management**: Contact and company information
-4. **Project Management**: Track freight forwarding projects
-5. **Price Database**: Manage pricing for different routes and transport types
+4. **Customer Management**: Manage customer information with filtering, pagination, and CSV import
+5. **Project Management**: Track freight forwarding projects
+6. **Price Database**: Manage pricing for different routes and transport types
 
 ### Database Schema (Supabase)
 The application connects to the following Supabase tables:
@@ -97,6 +110,7 @@ The application connects to the following Supabase tables:
 - `origin_locations`
 - `destination_locations`
 - `partners`
+- `customers` - Customer information (name, street, street2, zip, country, city, phone, email)
 - `projects`
 - `prices`
 
