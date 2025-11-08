@@ -160,7 +160,7 @@ const FreightForwarderApp = () => {
           <div className="text-center mb-8">
             <Package size={48} className="mx-auto text-blue-600 mb-4" />
             <h1 className="text-3xl font-bold text-gray-900">Yarres Pro</h1>
-            <p className="text-gray-600 mt-2">by Baris Pelin</p>
+            {/* Developer: Baris Pelin */}
           </div>
 
           <div className="mb-6 flex gap-2">
@@ -2868,7 +2868,7 @@ const FreightForwarderApp = () => {
       <div className="w-64 bg-white shadow-lg min-h-screen">
         <div className="p-6">
           <h1 className="text-2xl font-bold text-blue-600 mb-2">Yarres Pro</h1>
-          <p className="text-xs text-gray-500">by Baris Pelin</p>
+          {/* Developer: Baris Pelin */}
         </div>
 
         <nav className="px-3">

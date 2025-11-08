@@ -12,8 +12,7 @@
   
   - **Branding Update:**
     - Platform renamed to **Yarres Pro**
-    - Developer credit: **Baris Pelin**
-    - Updated branding on login page and sidebar
+    - Developer credit: **Baris Pelin** (in code comments only, not displayed on UI)
 
   - **Modern Sidebar Navigation:**
     - Left sidebar with hierarchical menu structure
