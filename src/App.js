@@ -505,6 +505,7 @@ const FreightForwarderApp = () => {
   const Projects = () => {
     const [showForm, setShowForm] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
+    const [partnerPrices, setPartnerPrices] = useState({});
     const [formData, setFormData] = useState({
       title: '',
       details: '',
@@ -513,7 +514,9 @@ const FreightForwarderApp = () => {
       status: 'yeni',
       loss_reason: '',
       selected_partners: [],
-      request_text: ''
+      request_text: '',
+      customer_id: '',
+      winning_partners: []
     });
 
     const generateProjectId = () => {
@@ -529,8 +532,11 @@ const FreightForwarderApp = () => {
         status: 'yeni',
         loss_reason: '',
         selected_partners: [],
-        request_text: ''
+        request_text: '',
+        customer_id: '',
+        winning_partners: []
       });
+      setPartnerPrices({});
       setEditingProject(null);
       setShowForm(false);
     };
@@ -592,7 +598,12 @@ const FreightForwarderApp = () => {
       await refreshProjects();
     };
 
-    const updatePartnerPrice = async (projectId, partnerId, price) => {
+    const addPartnerPrice = async (projectId, partnerId, price) => {
+      if (!price || price.trim() === '') {
+        alert('Lütfen bir fiyat giriniz.');
+        return;
+      }
+
       const project = projects.find(p => p.id === projectId);
       if (!project) return;
 
@@ -608,6 +619,38 @@ const FreightForwarderApp = () => {
       if (error) {
         console.error('Fiyat güncelleme hatası:', error);
         alert('Partner fiyatı güncellenirken bir hata oluştu. Lütfen tekrar deneyin.');
+        return;
+      }
+
+      setPartnerPrices(prev => {
+        const newPrices = { ...prev };
+        delete newPrices[`${projectId}-${partnerId}`];
+        return newPrices;
+      });
+
+      alert('Fiyat başarıyla eklendi!');
+      await refreshProjects();
+    };
+
+    const toggleWinningPartner = async (projectId, partnerId) => {
+      const project = projects.find(p => p.id === projectId);
+      if (!project) return;
+
+      const winningPartners = project.winning_partners || [];
+      const isWinning = winningPartners.includes(partnerId);
+
+      const updatedWinners = isWinning
+        ? winningPartners.filter(id => id !== partnerId)
+        : [...winningPartners, partnerId];
+
+      const { error } = await supabase
+        .from('projects')
+        .update({ winning_partners: updatedWinners })
+        .eq('id', projectId);
+
+      if (error) {
+        console.error('Kazanan partner güncellenirken hata:', error);
+        alert('Kazanan partner güncellenirken bir hata oluştu. Lütfen tekrar deneyin.');
         return;
       }
 
@@ -659,6 +702,20 @@ const FreightForwarderApp = () => {
                 className="px-4 py-2 border rounded-lg col-span-2"
                 rows="3"
               />
+              
+              <select
+                value={formData.customer_id}
+                onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+                className="px-4 py-2 border rounded-lg col-span-2"
+              >
+                <option value="">Müşteri Seç</option>
+                {customers.map(customer => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} - {customer.city}, {customer.country}
+                  </option>
+                ))}
+              </select>
+
               <select
                 value={formData.origin}
                 onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
@@ -762,10 +819,32 @@ const FreightForwarderApp = () => {
                     <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">{project.project_id}</span>
                   </div>
                   <p className="text-gray-600 mb-2">{project.details}</p>
+                  {project.customer_id && (
+                    <p className="text-sm text-gray-700 mb-1">
+                      <Users size={16} className="inline mr-1" />
+                      Müşteri: <span className="font-semibold">
+                        {customers.find(c => c.id === project.customer_id)?.name || 'Bilinmiyor'}
+                      </span>
+                      {customers.find(c => c.id === project.customer_id) && (
+                        <span className="text-gray-500 ml-1">
+                          ({customers.find(c => c.id === project.customer_id).city}, {customers.find(c => c.id === project.customer_id).country})
+                        </span>
+                      )}
+                    </p>
+                  )}
                   <p className="text-sm text-gray-500">
                     <MapPin size={16} className="inline mr-1" />
                     {project.origin} → {project.destination}
                   </p>
+                  {project.winning_partners && project.winning_partners.length > 0 && (
+                    <p className="text-sm text-green-700 font-semibold mt-2">
+                      <TrendingUp size={16} className="inline mr-1" />
+                      Kazanan Partnerler: {project.winning_partners.map(winningId => {
+                        const winningPartner = project.selected_partners?.find(p => p.id === winningId);
+                        return winningPartner?.company_name;
+                      }).filter(Boolean).join(', ')}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => startEditProject(project)} className="text-blue-600 hover:text-blue-800">
@@ -795,21 +874,52 @@ const FreightForwarderApp = () => {
                 <div>
                   <h4 className="font-semibold mb-2">Seçili Partnerler ve Fiyatlar</h4>
                   <div className="space-y-2">
-                    {project.selected_partners.map(partner => (
-                      <div key={partner.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                        <span>{partner.company_name}</span>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            placeholder="Fiyat"
-                            value={partner.price || ''}
-                            onChange={(e) => updatePartnerPrice(project.id, partner.id, e.target.value)}
-                            className="w-32 px-3 py-1 border rounded"
-                          />
-                          <span>€</span>
+                    {project.selected_partners.map(partner => {
+                      const priceKey = `${project.id}-${partner.id}`;
+                      const isWinning = (project.winning_partners || []).includes(partner.id);
+                      
+                      return (
+                        <div key={partner.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isWinning}
+                              onChange={() => toggleWinningPartner(project.id, partner.id)}
+                              className="w-4 h-4"
+                              title="Kazanan Partner"
+                            />
+                            <span className={isWinning ? 'font-semibold text-green-700' : ''}>
+                              {partner.company_name}
+                              {isWinning && <span className="ml-2 text-xs bg-green-200 px-2 py-1 rounded">Kazanan</span>}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {partner.price ? (
+                              <span className="px-3 py-1 bg-white border rounded font-semibold">
+                                {partner.price} €
+                              </span>
+                            ) : (
+                              <>
+                                <input
+                                  type="number"
+                                  placeholder="Fiyat"
+                                  value={partnerPrices[priceKey] || ''}
+                                  onChange={(e) => setPartnerPrices(prev => ({ ...prev, [priceKey]: e.target.value }))}
+                                  className="w-32 px-3 py-1 border rounded"
+                                />
+                                <span>€</span>
+                                <button
+                                  onClick={() => addPartnerPrice(project.id, partner.id, partnerPrices[priceKey])}
+                                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                                >
+                                  Ekle
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
