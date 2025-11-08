@@ -547,10 +547,15 @@ const FreightForwarderApp = () => {
     };
 
     const handleSubmitProject = async () => {
+      const projectData = {
+        ...formData,
+        customer_id: formData.customer_id || null
+      };
+
       if (editingProject) {
         const { error } = await supabase
           .from('projects')
-          .update(formData)
+          .update(projectData)
           .eq('id', editingProject.id);
 
         if (error) {
@@ -562,7 +567,7 @@ const FreightForwarderApp = () => {
       } else {
         const { error } = await supabase
           .from('projects')
-          .insert([{ ...formData, project_id: generateProjectId() }]);
+          .insert([{ ...projectData, project_id: generateProjectId() }]);
 
         if (error) {
           console.error('Ekleme hatası:', error);
