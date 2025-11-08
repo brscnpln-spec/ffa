@@ -6,7 +6,25 @@ A comprehensive freight forwarding management system built with React and Supaba
 **Current State:** Configured for Replit environment with Create React App running on port 5000.
 
 ## Recent Changes
-- **November 8, 2025**: UI Improvements
+- **November 8, 2025**: Major UI and Feature Improvements
+  - **Price Database Enhancements:**
+    - **CSV Bulk Import:** Added ability to import prices from CSV files with format validation
+      - Supported CSV format: departure_city, arrival_city, transport_type, vehicle_type, company_name, price, weight, created_at, valid_until, cbm, ldm, length, height, width, notes
+      - Real-time validation with error reporting for invalid rows
+      - Success/failure notifications with detailed error messages
+      - Automatic dimension field merging (length x width x height)
+    - **Pagination System:** Implemented pagination for price listings
+      - 50 records per page
+      - Smart page number display with ellipsis for large datasets
+      - Previous/Next navigation buttons
+      - Page count and record range display
+    - **Advanced Filtering:** Added comprehensive filtering capabilities
+      - Filter by origin, destination, partner, transport type, vehicle type
+      - Price range filtering (min/max)
+      - Real-time filter updates
+      - Filter reset functionality
+      - Filtered record count display
+    
   - **Master Data UI Enhancement:**
     - Converted "Temel Tanımlar" (Master Data) from dropdown selection to tab-based navigation
     - Users now stay on the same tab after making changes (add, edit, delete operations)

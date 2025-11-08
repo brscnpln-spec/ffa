@@ -819,6 +819,19 @@ const FreightForwarderApp = () => {
   const PriceDatabase = () => {
     const [showForm, setShowForm] = useState(false);
     const [editingPrice, setEditingPrice] = useState(null);
+    const [showCsvImport, setShowCsvImport] = useState(false);
+    const [csvFile, setCsvFile] = useState(null);
+    const [importProgress, setImportProgress] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [filters, setFilters] = useState({
+      origin: '',
+      destination: '',
+      partner: '',
+      transport_type: '',
+      vehicle_type: '',
+      price_min: '',
+      price_max: ''
+    });
     const [formData, setFormData] = useState({
       origin: '',
       destination: '',
@@ -926,19 +939,390 @@ const FreightForwarderApp = () => {
       await refreshPrices();
     };
 
+    const parseCSV = (text) => {
+      const lines = text.split('\n').filter(line => line.trim());
+      if (lines.length < 2) return [];
+
+      const parseCSVLine = (line) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const headers = parseCSVLine(lines[0]);
+      const rows = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        const row = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+        rows.push(row);
+      }
+
+      return rows;
+    };
+
+    const validateAndConvertCSVRow = (row) => {
+      const errors = [];
+      
+      if (!row.departure_city) errors.push('Çıkış şehri eksik');
+      if (!row.arrival_city) errors.push('Varış şehri eksik');
+      if (!row.transport_type) errors.push('Nakliye tipi eksik');
+      if (!row.vehicle_type) errors.push('Araç tipi eksik');
+      if (!row.company_name) errors.push('Firma adı eksik');
+      if (!row.price) errors.push('Fiyat eksik');
+
+      const parseNumber = (value) => {
+        if (!value || value.trim() === '') return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? undefined : num;
+      };
+
+      const price = parseNumber(row.price);
+      if (row.price && price === undefined) errors.push('Fiyat geçersiz sayı');
+
+      const weight = parseNumber(row.weight);
+      if (row.weight && weight === undefined) errors.push('Ağırlık geçersiz sayı');
+
+      const cbm = parseNumber(row.cbm);
+      if (row.cbm && cbm === undefined) errors.push('CBM geçersiz sayı');
+
+      const ldm = parseNumber(row.ldm);
+      if (row.ldm && ldm === undefined) errors.push('LDM geçersiz sayı');
+
+      const parseLength = parseNumber(row.length);
+      const parseWidth = parseNumber(row.width);
+      const parseHeight = parseNumber(row.height);
+      
+      if ((row.length && parseLength === undefined) || 
+          (row.width && parseWidth === undefined) || 
+          (row.height && parseHeight === undefined)) {
+        errors.push('Boyut değerleri geçersiz');
+      }
+
+      if (errors.length > 0) {
+        return { success: false, errors };
+      }
+
+      const dimensions = parseLength || parseWidth || parseHeight
+        ? `${parseLength || ''} x ${parseWidth || ''} x ${parseHeight || ''} (cm)`.replace(/\s+x\s+x\s+/, ' x ').trim()
+        : '';
+
+      return {
+        success: true,
+        data: {
+          origin: row.departure_city.trim(),
+          destination: row.arrival_city.trim(),
+          partner: row.company_name.trim(),
+          transport_type: row.transport_type.trim(),
+          vehicle_type: row.vehicle_type.trim(),
+          price: price,
+          weight: weight,
+          cbm: cbm,
+          ldm: ldm,
+          dimensions: dimensions || null,
+          valid_until: row.valid_until?.trim() || null,
+          notes: row.notes?.trim() || null
+        }
+      };
+    };
+
+    const handleCsvImport = async () => {
+      if (!csvFile) {
+        alert('Lütfen bir CSV dosyası seçin.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          setImportProgress({ status: 'processing', message: 'CSV dosyası işleniyor...' });
+          
+          const text = e.target.result;
+          const rows = parseCSV(text);
+          
+          if (rows.length === 0) {
+            setImportProgress({ status: 'error', message: 'CSV dosyası boş veya geçersiz format.' });
+            return;
+          }
+
+          const validRows = [];
+          const invalidRows = [];
+
+          rows.forEach((row, index) => {
+            const result = validateAndConvertCSVRow(row);
+            if (result.success) {
+              validRows.push(result.data);
+            } else {
+              invalidRows.push({ row: index + 2, errors: result.errors });
+            }
+          });
+
+          if (validRows.length === 0) {
+            setImportProgress({ 
+              status: 'error', 
+              message: `Tüm satırlar geçersiz. ${invalidRows.length} hata bulundu.`,
+              details: invalidRows 
+            });
+            return;
+          }
+
+          setImportProgress({ 
+            status: 'importing', 
+            message: `${validRows.length} kayıt veritabanına ekleniyor...` 
+          });
+
+          let successCount = 0;
+          let failCount = 0;
+          const dbErrors = [];
+
+          for (let i = 0; i < validRows.length; i++) {
+            try {
+              const { error } = await supabase
+                .from('prices')
+                .insert([validRows[i]]);
+
+              if (error) {
+                failCount++;
+                dbErrors.push({ row: i + invalidRows.length + 2, errors: [error.message] });
+              } else {
+                successCount++;
+              }
+            } catch (err) {
+              failCount++;
+              dbErrors.push({ row: i + invalidRows.length + 2, errors: [err.message] });
+            }
+          }
+
+          await refreshPrices();
+          
+          const allErrors = [...invalidRows, ...dbErrors];
+          setImportProgress({ 
+            status: successCount > 0 ? 'success' : 'error', 
+            message: `${successCount} fiyat başarıyla eklendi.${failCount > 0 ? ` ${failCount} kayıt eklenemedi.` : ''}${invalidRows.length > 0 ? ` ${invalidRows.length} satır format hatası nedeniyle atlandı.` : ''}`,
+            successCount: successCount,
+            errorCount: allErrors.length,
+            errors: allErrors
+          });
+
+          setCsvFile(null);
+          setTimeout(() => {
+            setShowCsvImport(false);
+            setImportProgress(null);
+          }, 5000);
+
+        } catch (error) {
+          console.error('CSV işleme hatası:', error);
+          setImportProgress({ 
+            status: 'error', 
+            message: 'CSV dosyası işlenirken hata oluştu: ' + error.message 
+          });
+        }
+      };
+
+      reader.readAsText(csvFile);
+    };
+
+    const handleFileChange = (e) => {
+      const file = e.target.files[0];
+      if (file && file.type === 'text/csv') {
+        setCsvFile(file);
+        setImportProgress(null);
+      } else {
+        alert('Lütfen geçerli bir CSV dosyası seçin.');
+        e.target.value = '';
+      }
+    };
+
     const isExpired = (date) => {
       if (!date) return false;
       return new Date(date) < new Date();
+    };
+
+    const getFilteredPrices = () => {
+      return prices.filter(price => {
+        if (filters.origin && !price.origin?.toLowerCase().includes(filters.origin.toLowerCase())) return false;
+        if (filters.destination && !price.destination?.toLowerCase().includes(filters.destination.toLowerCase())) return false;
+        if (filters.partner && !price.partner?.toLowerCase().includes(filters.partner.toLowerCase())) return false;
+        if (filters.transport_type && !price.transport_type?.toLowerCase().includes(filters.transport_type.toLowerCase())) return false;
+        if (filters.vehicle_type && !price.vehicle_type?.toLowerCase().includes(filters.vehicle_type.toLowerCase())) return false;
+        if (filters.price_min && parseFloat(price.price) < parseFloat(filters.price_min)) return false;
+        if (filters.price_max && parseFloat(price.price) > parseFloat(filters.price_max)) return false;
+        return true;
+      });
+    };
+
+    const resetFilters = () => {
+      setFilters({
+        origin: '',
+        destination: '',
+        partner: '',
+        transport_type: '',
+        vehicle_type: '',
+        price_min: '',
+        price_max: ''
+      });
+      setCurrentPage(1);
+    };
+
+    const filteredPrices = getFilteredPrices();
+    const itemsPerPage = 50;
+    const totalPages = Math.ceil(filteredPrices.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentPrices = filteredPrices.slice(startIndex, endIndex);
+
+    const goToPage = (page) => {
+      if (page >= 1 && page <= totalPages) {
+        setCurrentPage(page);
+      }
+    };
+
+    const getPageNumbers = () => {
+      const pages = [];
+      const maxVisible = 5;
+      
+      if (totalPages <= maxVisible) {
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        if (currentPage <= 3) {
+          for (let i = 1; i <= 4; i++) pages.push(i);
+          pages.push('...');
+          pages.push(totalPages);
+        } else if (currentPage >= totalPages - 2) {
+          pages.push(1);
+          pages.push('...');
+          for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+        } else {
+          pages.push(1);
+          pages.push('...');
+          pages.push(currentPage - 1);
+          pages.push(currentPage);
+          pages.push(currentPage + 1);
+          pages.push('...');
+          pages.push(totalPages);
+        }
+      }
+      
+      return pages;
     };
 
     return (
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Fiyat Veritabanı</h2>
-          <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-            <Plus size={20} /> Yeni Fiyat
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowCsvImport(!showCsvImport)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
+              <Plus size={20} /> CSV İçe Aktar
+            </button>
+            <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+              <Plus size={20} /> Yeni Fiyat
+            </button>
+          </div>
         </div>
+
+        {showCsvImport && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h3 className="text-xl font-semibold mb-4">CSV Dosyasından Toplu Fiyat İçe Aktarma</h3>
+            
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800 font-semibold mb-2">CSV Format Bilgisi:</p>
+              <p className="text-xs text-blue-700 font-mono">
+                departure_city,arrival_city,transport_type,vehicle_type,company_name,price,weight,created_at,valid_until,cbm,ldm,length,height,width,notes
+              </p>
+              <p className="text-xs text-blue-600 mt-2">
+                * Zorunlu alanlar: departure_city, arrival_city, transport_type, vehicle_type, company_name, price
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                CSV Dosyası Seç
+              </label>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              {csvFile && (
+                <p className="text-sm text-green-600 mt-2">
+                  Seçilen dosya: {csvFile.name}
+                </p>
+              )}
+            </div>
+
+            {importProgress && (
+              <div className={`mb-4 p-4 rounded-lg ${
+                importProgress.status === 'success' ? 'bg-green-50 border border-green-200' :
+                importProgress.status === 'error' ? 'bg-red-50 border border-red-200' :
+                'bg-yellow-50 border border-yellow-200'
+              }`}>
+                <p className={`text-sm font-semibold ${
+                  importProgress.status === 'success' ? 'text-green-800' :
+                  importProgress.status === 'error' ? 'text-red-800' :
+                  'text-yellow-800'
+                }`}>
+                  {importProgress.message}
+                </p>
+                {importProgress.errors && importProgress.errors.length > 0 && (
+                  <div className="mt-2 max-h-40 overflow-y-auto">
+                    <p className="text-xs text-red-700 font-semibold">Hatalı Satırlar:</p>
+                    {importProgress.errors.slice(0, 10).map((err, idx) => (
+                      <p key={idx} className="text-xs text-red-600">
+                        Satır {err.row}: {err.errors.join(', ')}
+                      </p>
+                    ))}
+                    {importProgress.errors.length > 10 && (
+                      <p className="text-xs text-red-600 mt-1">
+                        ... ve {importProgress.errors.length - 10} hata daha
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button 
+                onClick={handleCsvImport} 
+                disabled={!csvFile || importProgress?.status === 'importing'}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {importProgress?.status === 'importing' ? 'İçe Aktarılıyor...' : 'İçe Aktar'}
+              </button>
+              <button 
+                onClick={() => {
+                  setShowCsvImport(false);
+                  setCsvFile(null);
+                  setImportProgress(null);
+                }} 
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        )}
 
         {showForm && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -1073,6 +1457,91 @@ const FreightForwarderApp = () => {
           </div>
         )}
 
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <h3 className="text-lg font-semibold mb-4">Filtrele</h3>
+          <div className="grid grid-cols-4 gap-4">
+            <input
+              type="text"
+              placeholder="Çıkış Lokasyonu"
+              value={filters.origin}
+              onChange={(e) => {
+                setFilters({ ...filters, origin: e.target.value });
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+            <input
+              type="text"
+              placeholder="Varış Lokasyonu"
+              value={filters.destination}
+              onChange={(e) => {
+                setFilters({ ...filters, destination: e.target.value });
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+            <input
+              type="text"
+              placeholder="Partner"
+              value={filters.partner}
+              onChange={(e) => {
+                setFilters({ ...filters, partner: e.target.value });
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+            <input
+              type="text"
+              placeholder="Nakliye Tipi"
+              value={filters.transport_type}
+              onChange={(e) => {
+                setFilters({ ...filters, transport_type: e.target.value });
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+            <input
+              type="text"
+              placeholder="Araç Tipi"
+              value={filters.vehicle_type}
+              onChange={(e) => {
+                setFilters({ ...filters, vehicle_type: e.target.value });
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+            <input
+              type="number"
+              placeholder="Min Fiyat (€)"
+              value={filters.price_min}
+              onChange={(e) => {
+                setFilters({ ...filters, price_min: e.target.value });
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+            <input
+              type="number"
+              placeholder="Max Fiyat (€)"
+              value={filters.price_max}
+              onChange={(e) => {
+                setFilters({ ...filters, price_max: e.target.value });
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+            <button
+              onClick={resetFilters}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+            >
+              Filtreleri Sıfırla
+            </button>
+          </div>
+          <div className="mt-3 text-sm text-gray-600">
+            Toplam {filteredPrices.length} fiyat bulundu {filteredPrices.length !== prices.length && `(${prices.length} kayıt içinden)`}
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg shadow overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -1087,44 +1556,99 @@ const FreightForwarderApp = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {prices.map(price => (
-                <tr key={price.id} className={isExpired(price.valid_until) ? 'bg-red-50' : ''}>
-                  <td className="px-4 py-3">
-                    <div className="text-sm">{price.origin} → {price.destination}</div>
-                  </td>
-                  <td className="px-4 py-3">{price.partner}</td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm">{price.transport_type}</div>
-                    <div className="text-xs text-gray-500">{price.vehicle_type}</div>
-                  </td>
-                  <td className="px-4 py-3 font-semibold">{price.price} €</td>
-                  <td className="px-4 py-3">
-                    <div className="text-xs">
-                      {price.weight && <div>Ağırlık: {price.weight} kg</div>}
-                      {price.cbm && <div>CBM: {price.cbm}</div>}
-                      {price.ldm && <div>LDM: {price.ldm}</div>}
-                      {price.dimensions && <div>Boyut: {price.dimensions}</div>}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className={`text-sm ${isExpired(price.valid_until) ? 'text-red-600 font-semibold' : ''}`}>
-                      {price.valid_until || 'Belirtilmemiş'}
-                      {isExpired(price.valid_until) && <div className="text-xs">Süresi doldu</div>}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => startEditPrice(price)} className="text-blue-600 hover:text-blue-800 mr-3">
-                      <Edit2 size={18} />
-                    </button>
-                    <button onClick={() => confirmDelete(() => deletePrice(price.id))} className="text-red-600 hover:text-red-800">
-                      <Trash2 size={18} />
-                    </button>
+              {currentPrices.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                    {filters.origin || filters.destination || filters.partner || filters.transport_type || filters.vehicle_type || filters.price_min || filters.price_max
+                      ? 'Filtrelere uygun fiyat bulunamadı.'
+                      : 'Henüz fiyat kaydı yok.'}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                currentPrices.map(price => (
+                  <tr key={price.id} className={isExpired(price.valid_until) ? 'bg-red-50' : ''}>
+                    <td className="px-4 py-3">
+                      <div className="text-sm">{price.origin} → {price.destination}</div>
+                    </td>
+                    <td className="px-4 py-3">{price.partner}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm">{price.transport_type}</div>
+                      <div className="text-xs text-gray-500">{price.vehicle_type}</div>
+                    </td>
+                    <td className="px-4 py-3 font-semibold">{price.price} €</td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs">
+                        {price.weight && <div>Ağırlık: {price.weight} kg</div>}
+                        {price.cbm && <div>CBM: {price.cbm}</div>}
+                        {price.ldm && <div>LDM: {price.ldm}</div>}
+                        {price.dimensions && <div>Boyut: {price.dimensions}</div>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className={`text-sm ${isExpired(price.valid_until) ? 'text-red-600 font-semibold' : ''}`}>
+                        {price.valid_until || 'Belirtilmemiş'}
+                        {isExpired(price.valid_until) && <div className="text-xs">Süresi doldu</div>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button onClick={() => startEditPrice(price)} className="text-blue-600 hover:text-blue-800 mr-3">
+                        <Edit2 size={18} />
+                      </button>
+                      <button onClick={() => confirmDelete(() => deletePrice(price.id))} className="text-red-600 hover:text-red-800">
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="bg-white rounded-lg shadow p-4 mt-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Sayfa {currentPage} / {totalPages} - Gösterilen: {startIndex + 1}-{Math.min(endIndex, filteredPrices.length)} / {filteredPrices.length}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Önceki
+                </button>
+                
+                {getPageNumbers().map((page, index) => (
+                  page === '...' ? (
+                    <span key={`dots-${index}`} className="px-3 py-1 text-gray-500">...</span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-1 border rounded-lg text-sm ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                ))}
+
+                <button
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Sonraki
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
