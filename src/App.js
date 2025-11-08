@@ -940,6 +940,8 @@ const FreightForwarderApp = () => {
     };
 
     const parseCSV = (text) => {
+      text = text.replace(/^\uFEFF/, '');
+      
       const lines = text.split('\n').filter(line => line.trim());
       if (lines.length < 2) return [];
 
@@ -995,6 +997,28 @@ const FreightForwarderApp = () => {
         return isNaN(num) ? undefined : num;
       };
 
+      const parseDate = (dateStr) => {
+        if (!dateStr || dateStr.trim() === '') return null;
+        
+        const formats = [
+          /^(\d{2})\/(\d{2})\/(\d{4})$/,
+          /^(\d{4})-(\d{2})-(\d{2})$/
+        ];
+        
+        for (let format of formats) {
+          const match = dateStr.trim().match(format);
+          if (match) {
+            if (format === formats[0]) {
+              const [, day, month, year] = match;
+              return `${year}-${month}-${day}`;
+            } else {
+              return dateStr.trim();
+            }
+          }
+        }
+        return undefined;
+      };
+
       const price = parseNumber(row.price);
       if (row.price && price === undefined) errors.push('Fiyat geçersiz sayı');
 
@@ -1015,6 +1039,11 @@ const FreightForwarderApp = () => {
           (row.width && parseWidth === undefined) || 
           (row.height && parseHeight === undefined)) {
         errors.push('Boyut değerleri geçersiz');
+      }
+
+      const validUntil = parseDate(row.valid_until);
+      if (row.valid_until && validUntil === undefined) {
+        errors.push('Geçerlilik tarihi geçersiz format (DD/MM/YYYY veya YYYY-MM-DD kullanın)');
       }
 
       if (errors.length > 0) {
@@ -1038,7 +1067,7 @@ const FreightForwarderApp = () => {
           cbm: cbm,
           ldm: ldm,
           dimensions: dimensions || null,
-          valid_until: row.valid_until?.trim() || null,
+          valid_until: validUntil,
           notes: row.notes?.trim() || null
         }
       };
